@@ -28,7 +28,7 @@ void main();
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 void Init();
 void InitShaders();
-GenerateMesh(Mesh *mesh);
+void GenerateMesh(Mesh *mesh);
 void Draw();
 
 #endif // __TEMPLATE_H__
