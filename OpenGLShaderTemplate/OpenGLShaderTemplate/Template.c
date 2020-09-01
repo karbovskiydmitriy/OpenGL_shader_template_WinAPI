@@ -86,7 +86,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 void Init()
 {
 	GetClientRect(hMainWindow, &rect);
-	ShowCursor(0);
+	ShowCursor(false);
 
 	clock = GetTickCount();
 
