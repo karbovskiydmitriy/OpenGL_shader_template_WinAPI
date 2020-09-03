@@ -74,9 +74,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		}
 	case WM_DESTROY:
 		PostQuitMessage(0);
+			
 		return 0;
 	case WM_PAINT:
 		Draw();
+			
 		return 0;
 	}
 
