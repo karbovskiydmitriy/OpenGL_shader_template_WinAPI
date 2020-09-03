@@ -1,3 +1,5 @@
+#pragma once
+
 #ifndef __CUBE_H__
 #define __CUBE_H__
 
