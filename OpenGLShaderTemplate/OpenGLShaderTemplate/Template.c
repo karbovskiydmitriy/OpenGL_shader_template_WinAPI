@@ -1,13 +1,12 @@
 #include "Template.h"
 
-const char *const vertexShader = "void main(void){vec4 a=gl_Vertex;a*=.5;gl_Position=gl_ModelViewProjectionMatrix*a;}";
-const char *const fragmentShader = "void main(void){gl_FragColor=vec4(1.,0.,0.,1.);}";
-
 HWND hMainWindow;
 HDC hdc;
 HGLRC hrc;
-RECT rect;
-int clock;
+RECT clientRect;
+int startTime;
+int time;
+int currentTime;
 float angle;
 float speed = 0.18f;
 
@@ -18,14 +17,46 @@ float zFar = 1000.0f;
 int verticesCount;
 Vertex *vertices;
 Color *colors;
+HANDLE hOpenGL;
+
+PFNGLUSEPROGRAMPROC glUseProgram;
+PFNGLDETACHSHADERPROC glDetachShader;
+PFNGLDELETESHADERPROC glDeleteShader;
+PFNGLDELETEPROGRAMPROC glDeleteProgram;
+PFNGLCREATESHADERPROC glCreateShader;
+PFNGLSHADERSOURCEPROC glShaderSource;
+PFNGLCOMPILESHADERPROC glCompileShader;
+PFNGLGETSHADERIVPROC glGetShaderiv;
+PFNGLCREATEPROGRAMPROC glCreateProgram;
+PFNGLATTACHSHADERPROC glAttachShader;
+PFNGLLINKPROGRAMPROC glLinkProgram;
+PFNGLGETPROGRAMIVPROC glGetProgramiv;
+PFNGLGETUNIFORMLOCATIONPROC glGetUniformLocation;
+PFNGLUNIFORM1FPROC glUniform1f;
+PFNGLUNIFORM2FPROC glUniform2f;
+PFNGLUNIFORM1IPROC glUniform1i;
 
 bool useShaders = true;
-GLuint vertexShaderObject, fragmentShaderObject;
-GLint program;
+GLuint vertexShader;
+GLuint fragmentShader;
+GLint renderProgram = 0;
+
+GLint depthRenderBuffer;
+
+GLint timeLocation;
+GLint screenSizeLocation1;
+GLint screenSizeLocation2;
+GLint depthBufferLocation1;
+GLint depthBufferLocation2;
+
+GLint drawBuffers[1] =
+{
+	GL_COLOR_ATTACHMENT0
+};
 
 Color backColor =
 {
-	0.0f, 0.0f, 1.0f
+	0.22f, 0.22f, 0.22f
 };
 
 Color c =
@@ -51,7 +82,8 @@ void main()
 	MSG msg;
 
 	RegisterClassEx(&wndClass);
-	hMainWindow = CreateWindowEx(0, CLASS_NAME, 0, WS_CUSTOM, 0, 0, 0, 0, 0, 0, 0, 0);
+	hMainWindow = CreateWindowEx(0, CLASS_NAME, 0, WS_CUSTOM, 0, 0, GetSystemMetrics(SM_CXSCREEN) / 2, GetSystemMetrics(SM_CYSCREEN) / 2, 0, 0, 0, 0);
+	ShowWindow(hMainWindow, SW_SHOWNORMAL);
 
 	Init();
 
@@ -68,6 +100,13 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	switch (uMsg)
 	{
 	case WM_KEYDOWN:
+		if (wParam == VK_SPACE)
+		{
+			useShaders = !useShaders;
+		} else if (wParam == 'R')
+		{
+			InitShaders();
+		}
 		if (wParam != VK_ESCAPE)
 		{
 			break;
@@ -87,71 +126,200 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 void Init()
 {
-	GetClientRect(hMainWindow, &rect);
+	GetClientRect(hMainWindow, &clientRect);
 	ShowCursor(false);
 
-	clock = GetTickCount();
+	hOpenGL = LoadLibrary("opengl32.dll");
+
+	time = GetTickCount();
+	startTime = time;
 
 	hdc = GetDC(hMainWindow);
 	SetPixelFormat(hdc, ChoosePixelFormat(hdc, &pfd), &pfd);
 
 	hrc = wglCreateContext(hdc);
 	wglMakeCurrent(hdc, hrc);
-	glViewport(0, 0, rect.right, rect.bottom);
+	glViewport(0, 0, clientRect.right, clientRect.bottom);
 
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	gluPerspective(fov, (float)rect.right / rect.bottom, zNear, zFar);
+	gluPerspective(fov, (float)clientRect.right / clientRect.bottom, zNear, zFar);
 	glEnable(GL_DEPTH_TEST);
 	glShadeModel(GL_SMOOTH);
 	glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
-
-	if (useShaders)
-	{
-		InitShaders();
-	}
+	
+	InitExtensions();
+	InitShaders();
 
 	GenerateMesh(&cube);
 }
 
+void InitExtensions()
+{
+	glCreateShader = (PFNGLCREATESHADERPROC)GetExtension("glCreateShader");
+	glDetachShader = (PFNGLDETACHSHADERPROC)GetExtension("glDetachShader");
+	glDeleteShader = (PFNGLDELETESHADERPROC)GetExtension("glDeleteShader");
+	glDeleteProgram = (PFNGLDELETEPROGRAMPROC)GetExtension("glDeleteProgram");
+	glShaderSource = (PFNGLSHADERSOURCEPROC)GetExtension("glShaderSource");
+	glCompileShader = (PFNGLCOMPILESHADERPROC)GetExtension("glCompileShader");
+	glGetShaderiv = (PFNGLGETSHADERIVPROC)GetExtension("glGetShaderiv");
+	glCreateProgram = (PFNGLCREATEPROGRAMPROC)GetExtension("glCreateProgram");
+	glAttachShader = (PFNGLATTACHSHADERPROC)GetExtension("glAttachShader");
+	glLinkProgram = (PFNGLLINKPROGRAMPROC)GetExtension("glLinkProgram");
+	glGetProgramiv = (PFNGLGETPROGRAMIVPROC)GetExtension("glGetProgramiv");
+	glUseProgram = (PFNGLUSEPROGRAMPROC)GetExtension("glUseProgram");
+	glGetUniformLocation = (PFNGLGETUNIFORMLOCATIONPROC)GetExtension("glGetUniformLocation");
+	glUniform1f = (PFNGLUNIFORM1FPROC)GetExtension("glUniform1f");
+	glUniform2f = (PFNGLUNIFORM2FPROC)GetExtension("glUniform2f");
+	glUniform1i = (PFNGLUNIFORM1IPROC)GetExtension("glUniform1i");
+}
+
+void *GetExtension(char *functionName)
+{
+	void *pointer;
+
+	pointer = wglGetProcAddress(functionName);
+	if (pointer != (void *)-1 && pointer != (void *)0 && pointer != (void *)1 && pointer != (void *)2 && pointer != (void *)3)
+	{
+		return pointer;
+	}
+	else
+	{
+		pointer = GetProcAddress(hOpenGL, functionName);
+		if (pointer)
+		{
+			return pointer;
+		}
+	}
+
+	return 0;
+}
+
 void InitShaders()
 {
-	GLint shaderLength, compiled, linked;
+	glUseProgram(0);
 
-	shaderLength = strlen(vertexShader);
-
-	vertexShaderObject = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(vertexShaderObject, 1, &vertexShader, &shaderLength);
-	glCompileShader(vertexShaderObject);
-
-	glGetShaderiv(vertexShaderObject, GL_COMPILE_STATUS, &compiled);
-	if (!compiled)
+	if (renderProgram)
 	{
-		ExitProcess(42);
+		glDetachShader(renderProgram, vertexShader);
+		glDetachShader(renderProgram, fragmentShader);
+		glDeleteShader(vertexShader);
+		glDeleteShader(fragmentShader);
+		glDeleteProgram(renderProgram);
 	}
 
-	shaderLength = strlen(fragmentShader);
-
-	fragmentShaderObject = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(fragmentShaderObject, 1, &fragmentShader, &shaderLength);
-	glCompileShader(fragmentShaderObject);
-
-	glGetShaderiv(fragmentShaderObject, GL_COMPILE_STATUS, &compiled);
-	if (!compiled)
+	vertexShader = LoadShader(VERTEX_SHADER_FILE_NAME, GL_VERTEX_SHADER);
+	if (!vertexShader)
 	{
-		ExitProcess(17);
+		renderProgram = 0;
+
+		return;
 	}
+
+	fragmentShader = LoadShader(FRAGMENT_SHADER_FILE_NAME, GL_FRAGMENT_SHADER);
+	if (!fragmentShader)
+	{
+		renderProgram = 0;
+
+		return;
+	}
+
+	renderProgram = CreateProgram(vertexShader, fragmentShader);
+	if (renderProgram)
+	{
+		glUseProgram(renderProgram);
+
+		timeLocation = glGetUniformLocation(renderProgram, "time");
+		screenSizeLocation1 = glGetUniformLocation(renderProgram, "screenSize");
+		depthBufferLocation1 = glGetUniformLocation(renderProgram, "depthBuffer");
+	}
+	else
+	{
+		return;
+	}
+}
+
+GLint CreateProgram(GLuint vertexShader, GLuint fragmentShader)
+{
+	GLint program;
+	GLint linked;
 
 	program = glCreateProgram();
-	glAttachShader(program, vertexShaderObject);
-	glAttachShader(program, fragmentShaderObject);
+	if (vertexShader)
+	{
+		glAttachShader(program, vertexShader);
+	}
+	if (fragmentShader)
+	{
+		glAttachShader(program, fragmentShader);
+	}
 	glLinkProgram(program);
 
 	glGetProgramiv(program, GL_LINK_STATUS, &linked);
-	if (!linked)
+	if (linked)
 	{
-		ExitProcess(123);
+		return program;
 	}
+	else
+	{
+		if (vertexShader)
+		{
+			glDetachShader(program, vertexShader);
+			glDeleteShader(vertexShader);
+		}
+		if (fragmentShader)
+		{
+			glDetachShader(program, fragmentShader);
+			glDeleteShader(fragmentShader);
+		}
+		glDeleteProgram(program);
+
+		return 0;
+	}
+}
+
+GLuint LoadShader(char *fileName, GLenum type)
+{
+	char *buffer;
+	GLint shaderLength;
+	GLuint shader;
+	GLint compiled;
+
+	buffer = ReadFileContent(fileName);
+	shaderLength = strlen(buffer);
+
+	shader = glCreateShader(type);
+	glShaderSource(shader, 1, &buffer, &shaderLength);
+	glCompileShader(shader);
+
+	free(buffer);
+
+	glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
+	if (compiled)
+	{
+		return shader;
+	}
+	else
+	{
+		return null;
+	}
+}
+
+char *ReadFileContent(char *fileName)
+{
+	HANDLE hFile;
+	int length;
+	int written;
+	char *buffer;
+
+ 	hFile = CreateFile(fileName, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+	length = GetFileSize(hFile, 0);
+	buffer = (char *)calloc(length + 1, sizeof(char));
+	ReadFile(hFile, buffer, length, &written, 0);
+
+	CloseHandle(hFile);
+
+	return buffer;
 }
 
 void GenerateMesh(Mesh *mesh)
@@ -183,27 +351,27 @@ void GenerateMesh(Mesh *mesh)
 
 void Draw()
 {
-	int time;
-
-	time = GetTickCount();
-	if (time - clock > 10)
+	currentTime = GetTickCount();
+	if (currentTime - time > 10)
 	{
-		clock = time;
+		time = currentTime;
 		angle += speed * PI;
 	}
 
 	glClearColor(backColor.r, backColor.g, backColor.b, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	if (useShaders)
-	{
-		glUseProgram(program);
-	}
-
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 	gluLookAt(0, SIZE * 1.8f, SIZE * 3.6f, 0, 0, 0, 0, 1.0f, 0);
 	glRotatef(angle, 0.0f, 1.0f, 0.0f);
+
+	if (useShaders && renderProgram)
+	{
+		glUseProgram(renderProgram);
+		glUniform1f(timeLocation, (float)(currentTime - startTime));
+		glUniform2f(screenSizeLocation1, (float)clientRect.right, (float)clientRect.bottom);
+	}
 
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glEnableClientState(GL_COLOR_ARRAY);
