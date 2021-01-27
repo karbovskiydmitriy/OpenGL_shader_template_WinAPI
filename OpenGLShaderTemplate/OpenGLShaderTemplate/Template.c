@@ -34,20 +34,14 @@ PFNGLGETPROGRAMIVPROC glGetProgramiv;
 PFNGLGETUNIFORMLOCATIONPROC glGetUniformLocation;
 PFNGLUNIFORM1FPROC glUniform1f;
 PFNGLUNIFORM2FPROC glUniform2f;
-PFNGLUNIFORM1IPROC glUniform1i;
 
 bool useShaders = true;
 GLuint vertexShader;
 GLuint fragmentShader;
 GLint renderProgram = 0;
 
-GLint depthRenderBuffer;
-
 GLint timeLocation;
-GLint screenSizeLocation1;
-GLint screenSizeLocation2;
-GLint depthBufferLocation1;
-GLint depthBufferLocation2;
+GLint screenSizeLocation;
 
 GLint drawBuffers[1] =
 {
@@ -171,7 +165,6 @@ void InitExtensions()
 	glGetUniformLocation = (PFNGLGETUNIFORMLOCATIONPROC)GetExtension("glGetUniformLocation");
 	glUniform1f = (PFNGLUNIFORM1FPROC)GetExtension("glUniform1f");
 	glUniform2f = (PFNGLUNIFORM2FPROC)GetExtension("glUniform2f");
-	glUniform1i = (PFNGLUNIFORM1IPROC)GetExtension("glUniform1i");
 }
 
 void *GetExtension(char *functionName)
@@ -230,8 +223,7 @@ void InitShaders()
 		glUseProgram(renderProgram);
 
 		timeLocation = glGetUniformLocation(renderProgram, "time");
-		screenSizeLocation1 = glGetUniformLocation(renderProgram, "screenSize");
-		depthBufferLocation1 = glGetUniformLocation(renderProgram, "depthBuffer");
+		screenSizeLocation = glGetUniformLocation(renderProgram, "screenSize");
 	}
 	else
 	{
@@ -370,7 +362,7 @@ void Draw()
 	{
 		glUseProgram(renderProgram);
 		glUniform1f(timeLocation, (float)(currentTime - startTime));
-		glUniform2f(screenSizeLocation1, (float)clientRect.right, (float)clientRect.bottom);
+		glUniform2f(screenSizeLocation, (float)clientRect.right, (float)clientRect.bottom);
 	}
 
 	glEnableClientState(GL_VERTEX_ARRAY);
