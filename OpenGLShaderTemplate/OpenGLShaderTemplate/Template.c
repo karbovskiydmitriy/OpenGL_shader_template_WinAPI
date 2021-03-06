@@ -52,11 +52,6 @@ Color backColor =
 	0.22f, 0.22f, 0.22f
 };
 
-Color c =
-{
-	0.5f, 0.5f, 0.5f
-};
-
 WNDCLASSEX wndClass =
 {
 	sizeof(WNDCLASSEX), 0, WindowProc, 0, 0, 0, 0, 0, 0, 0, CLASS_NAME, 0
@@ -122,8 +117,6 @@ void Init()
 	GetClientRect(hMainWindow, &clientRect);
 	ShowCursor(false);
 
-	hOpenGL = LoadLibrary(OPENGL_LIB_NAME);
-
 	time = GetTickCount();
 	startTime = time;
 
@@ -157,6 +150,8 @@ void Init()
 
 void InitExtensions()
 {
+	hOpenGL = LoadLibrary(OPENGL_LIB_NAME);
+
 	glCreateShader = (PFNGLCREATESHADERPROC)GetExtension("glCreateShader");
 	glDetachShader = (PFNGLDETACHSHADERPROC)GetExtension("glDetachShader");
 	glDeleteShader = (PFNGLDELETESHADERPROC)GetExtension("glDeleteShader");
