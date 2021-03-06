@@ -31,9 +31,4 @@ Triangle cubeIndices[] =
 	{ 4, 0, 6 }
 };
 
-Mesh cube =
-{
-	12, cubeVertices, (Color *)0, cubeIndices
-};
-
 #endif // __CUBE_H__

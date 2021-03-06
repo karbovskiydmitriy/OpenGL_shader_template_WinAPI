@@ -15,6 +15,7 @@
 # Precompiled Headers
 *.gch
 *.pch
+*.ipch
 
 # Libraries
 *.lib
@@ -50,3 +51,12 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# Misc
+*.log
+*.tlog
+*.suo
+*.sdf
+*.opensdf
+Debug
+Release

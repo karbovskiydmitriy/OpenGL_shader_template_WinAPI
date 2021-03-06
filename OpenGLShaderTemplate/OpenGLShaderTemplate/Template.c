@@ -15,8 +15,9 @@ float zNear = 0.1f;
 float zFar = 1000.0f;
 
 int verticesCount;
-Vertex *vertices;
-Color *colors;
+GLuint verticesVBO;
+GLuint indicesVBO;
+
 HANDLE hOpenGL;
 
 PFNGLUSEPROGRAMPROC glUseProgram;
@@ -34,6 +35,9 @@ PFNGLGETPROGRAMIVPROC glGetProgramiv;
 PFNGLGETUNIFORMLOCATIONPROC glGetUniformLocation;
 PFNGLUNIFORM1FPROC glUniform1f;
 PFNGLUNIFORM2FPROC glUniform2f;
+PFNGLBINDBUFFERPROC glBindBuffer;
+PFNGLBUFFERDATAPROC glBufferData;
+PFNGLGENBUFFERSPROC glGenBuffers;
 
 bool useShaders = true;
 GLuint vertexShader;
@@ -42,11 +46,6 @@ GLint renderProgram = 0;
 
 GLint timeLocation;
 GLint screenSizeLocation;
-
-GLint drawBuffers[1] =
-{
-	GL_COLOR_ATTACHMENT0
-};
 
 Color backColor =
 {
@@ -123,7 +122,7 @@ void Init()
 	GetClientRect(hMainWindow, &clientRect);
 	ShowCursor(false);
 
-	hOpenGL = LoadLibrary("opengl32.dll");
+	hOpenGL = LoadLibrary(OPENGL_LIB_NAME);
 
 	time = GetTickCount();
 	startTime = time;
@@ -144,8 +143,16 @@ void Init()
 	
 	InitExtensions();
 	InitShaders();
+	
+	glGenBuffers(1, &verticesVBO);
+	glBindBuffer(GL_ARRAY_BUFFER, verticesVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
+	
+	glGenBuffers(1, &indicesVBO);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indicesVBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(cubeIndices), cubeIndices, GL_STATIC_DRAW);
 
-	GenerateMesh(&cube);
+	verticesCount = sizeof(cubeIndices) / sizeof(Triangle) * 3;
 }
 
 void InitExtensions()
@@ -165,6 +172,9 @@ void InitExtensions()
 	glGetUniformLocation = (PFNGLGETUNIFORMLOCATIONPROC)GetExtension("glGetUniformLocation");
 	glUniform1f = (PFNGLUNIFORM1FPROC)GetExtension("glUniform1f");
 	glUniform2f = (PFNGLUNIFORM2FPROC)GetExtension("glUniform2f");
+	glBindBuffer = (PFNGLBINDBUFFERPROC)GetExtension("glBindBuffer");
+	glBufferData = (PFNGLBUFFERDATAPROC)GetExtension("glBufferData");
+	glGenBuffers = (PFNGLGENBUFFERSPROC)GetExtension("glGenBuffers");
 }
 
 void *GetExtension(char *functionName)
@@ -178,7 +188,7 @@ void *GetExtension(char *functionName)
 	}
 	else
 	{
-		pointer = GetProcAddress(hOpenGL, functionName);
+		pointer = GetProcAddress((HMODULE)hOpenGL, functionName);
 		if (pointer)
 		{
 			return pointer;
@@ -301,7 +311,7 @@ char *ReadFileContent(char *fileName)
 {
 	HANDLE hFile;
 	int length;
-	int written;
+	DWORD written;
 	char *buffer;
 
  	hFile = CreateFile(fileName, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
@@ -312,33 +322,6 @@ char *ReadFileContent(char *fileName)
 	CloseHandle(hFile);
 
 	return buffer;
-}
-
-void GenerateMesh(Mesh *mesh)
-{
-	int i, j;
-	int index;
-	int vertexIndex;
-	Triangle *t;
-
-	index = 0;
-	verticesCount = mesh->trianglesCount * 3;
-	vertices = (Vertex *)calloc(verticesCount, sizeof(Vertex));
-	colors = (Color *)calloc(verticesCount, sizeof(Vertex));
-
-	for (i = 0; i < mesh->trianglesCount; i++)
-	{
-		t = &mesh->indices[i];
-		for (j = 0; j < 3; j++)
-		{
-			vertexIndex = t->vertices[j];
-
-			vertices[index] = mesh->vertices[vertexIndex];
-			colors[index] = c;
-
-			index++;
-		}
-	}
 }
 
 void Draw()
@@ -365,15 +348,12 @@ void Draw()
 		glUniform2f(screenSizeLocation, (float)clientRect.right, (float)clientRect.bottom);
 	}
 
+	glBindBuffer(GL_ARRAY_BUFFER, verticesVBO);
+	glVertexPointer(3, GL_FLOAT, 0, 0);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indicesVBO);
 	glEnableClientState(GL_VERTEX_ARRAY);
-	glEnableClientState(GL_COLOR_ARRAY);
-
-	glVertexPointer(3, GL_FLOAT, 0, vertices);
-	glColorPointer(3, GL_FLOAT, 0, colors);
-	glDrawArrays(GL_TRIANGLES, 0, verticesCount);
-
+	glDrawElements(GL_TRIANGLES, verticesCount, GL_UNSIGNED_BYTE, 0);
 	glDisableClientState(GL_VERTEX_ARRAY);
-	glDisableClientState(GL_COLOR_ARRAY);
 
 	if (useShaders)
 	{

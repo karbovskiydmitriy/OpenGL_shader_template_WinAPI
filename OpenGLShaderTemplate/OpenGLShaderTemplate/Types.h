@@ -24,12 +24,4 @@ typedef struct _Triangle
 	byte vertices[3];
 } Triangle;
 
-typedef struct _Mesh
-{
-	int trianglesCount;
-	Vertex *vertices;
-	Color *colors;
-	Triangle *indices;
-} Mesh;
-
 #endif // __TYPES_H__
